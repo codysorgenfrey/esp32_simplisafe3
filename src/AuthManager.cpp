@@ -230,12 +230,8 @@ SS3AuthManager::SS3AuthManager() {
     }
 }
 
-bool SS3AuthManager::isAuthorized() {
-    return accessToken.length() != 0;
-}
-
 bool SS3AuthManager::authorize(HardwareSerial *hwSerial, unsigned long baud) {
-    if (!isAuthorized()) {
+    if (refreshToken.length() == 0) {
         SS_LOG_LINE("Get that damn URL code:");
         SS_LOG_LINE("%s", getSS3AuthURL().c_str());
         if (!hwSerial) hwSerial->begin(baud);
@@ -255,10 +251,14 @@ bool SS3AuthManager::authorize(HardwareSerial *hwSerial, unsigned long baud) {
     return refreshAuthToken();
 }
 
-bool SS3AuthManager::isAuthenticated() {
+bool SS3AuthManager::isAuthorized() {
+    SS_LOG_LINE("Issue: %u, expires: %u", tokenIssueMS, expiresInMS);
+    if (tokenIssueMS == -1 || expiresInMS == -1) return false;
+
     unsigned long now = millis();
     unsigned long timeElapsed = max(now, tokenIssueMS) - min(now, tokenIssueMS);
-    return timeElapsed < expiresInMS && refreshToken.length() != 0;
+    SS_LOG_LINE("time elapsed: %u < %u && refresh token: %s", timeElapsed, expiresInMS - SS_REFRESH_BUFFER, refreshToken.length() != 0 ? "true" : "false");
+    return timeElapsed < (expiresInMS - SS_REFRESH_BUFFER) && refreshToken.length() != 0;
 }
 
 DynamicJsonDocument SS3AuthManager::request(

@@ -1,9 +1,9 @@
 #ifndef __SSCOMMON_H__
 #define __SSCOMMON_H__
 
-// #ifndef SS_DEBUG
-// #define SS_DEBUG true
-// #endif
+#ifndef SS_DEBUG
+#define SS_DEBUG false
+#endif
 
 // API constants
 #define SS3API "https://api.simplisafe.com/v1"
@@ -21,6 +21,8 @@
 #define SS_TIME_GMT_OFFSET -8 * 3600 // - 8 hours PST
 #define SS_DST_OFFSET 1 * 3600
 #define SS_NTP_SERVER "pool.ntp.org"
+
+#define SS_REFRESH_BUFFER 300000 // 5 minutes
 
 // Logging
 #if SS_DEBUG

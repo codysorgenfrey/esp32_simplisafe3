@@ -73,17 +73,17 @@ bool SimpliSafe3::startListeningToEvents(void (*eventCallback)(int eventId)) {
                 DeserializationError err = deserializeJson(res, payload);
                 if (err) SS_LOG_LINE("Error deserializing websocket response: %s", err.c_str());
 
-                String type = res["type"];
                 // listen for hello, then send identify
+                String type = res["type"];
                 if (type.equals("com.simplisafe.service.hello")) {
                     SS_LOG_LINE("SimpliSafe says hello.");
 
-                    configTime(SS_TIME_GMT_OFFSET, SS_DST_OFFSET, SS_NTP_SERVER);
                     struct tm timeInfo;
                     time_t now;
+                    char isoDate[20];
+                    configTime(SS_TIME_GMT_OFFSET, SS_DST_OFFSET, SS_NTP_SERVER);
                     getLocalTime(&timeInfo);
                     time(&now);
-                    char isoDate[20];
                     sprintf(
                         isoDate,
                         "%04i-%02i-%02iT%02i:%02i:%02i",
@@ -114,9 +114,10 @@ bool SimpliSafe3::startListeningToEvents(void (*eventCallback)(int eventId)) {
                     SS_LOG_LINE("Sent:");
                     #if SS_DEBUG
                         serializeJsonPretty(ident, Serial);
-                        Serial.println("");
+                        inSerial->println("");
                     #endif
                 }
+
                 // listen for registered
                 if (type.equals("com.simplisafe.service.registered")) SS_LOG_LINE("Websocket registered.");
                 
@@ -223,8 +224,11 @@ SimpliSafe3::SimpliSafe3() {
 }
 
 bool SimpliSafe3::setup(HardwareSerial *hwSerial, unsigned long baud) {
+    inSerial = hwSerial;
+    inBaud = baud;
+
     // get authorized for api calls
-    if (!authManager->authorize(hwSerial, baud)) {
+    if (!authManager->authorize(inSerial, inBaud)) {
         SS_LOG_LINE("Failed to authorize with SimpliSafe.");
         return false;
     }
@@ -233,10 +237,13 @@ bool SimpliSafe3::setup(HardwareSerial *hwSerial, unsigned long baud) {
 }
 
 void SimpliSafe3::loop() {
-    // poll here for WebSocket
+    // poll for WebSocket
     socket.loop();
 
-    // check here for refreshing auth token
+    // refresh auth token
+    if (millis() % 1000 == 0) { // check every second
+        if (!authManager->isAuthorized()) authManager->authorize(inSerial, inBaud);
+    }
 }
 
 int SimpliSafe3::getAlarmState() {

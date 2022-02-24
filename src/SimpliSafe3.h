@@ -97,6 +97,8 @@ class SimpliSafe3 {
         String lockId;
         SS3AuthManager *authManager;
         WebSocketsClient socket;
+        HardwareSerial *inSerial;
+        unsigned long inBaud;
 
         String getUserID();
         DynamicJsonDocument getSubscription();

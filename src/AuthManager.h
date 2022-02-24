@@ -14,8 +14,8 @@ class SS3AuthManager {
         String refreshToken;
         String codeVerifier;
         String codeChallenge;
-        unsigned long tokenIssueMS;
-        unsigned long expiresInMS;
+        unsigned long tokenIssueMS = -1;
+        unsigned long expiresInMS = -1;
 
         String base64URLEncode(uint8_t *buffer);
         void sha256(const char *inBuff, uint8_t *outBuff);
@@ -31,9 +31,8 @@ class SS3AuthManager {
         String accessToken;
 
         SS3AuthManager();
-        bool isAuthorized();
         bool authorize(HardwareSerial *hwSerial, unsigned long baud);
-        bool isAuthenticated();
+        bool isAuthorized();
         DynamicJsonDocument request(
             String url, 
             int docSize = 3072, 

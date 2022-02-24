@@ -32,9 +32,9 @@ void setup()
     }
 
     int alarmState = ss.getAlarmState();
-    LOG("Alarm state: %i (UNKNOWN,OFF,HOME,HOME_COUNT,AWAY,AWAY_COUNT,ALARM,ALARM_COUNT)", alarmState);
+    LOG("Alarm state: %i (-1 UNKNOWN, 0 OFF, 1 HOME, 2 HOME_COUNT, 3 AWAY, 4 AWAY_COUNT, 5 ALARM, 6 ALARM_COUNT)", alarmState);
     int lockState = ss.getLockState();
-    LOG("Lock state: %i (UNKNOWN,UNLOCKED,LOCKED)", lockState);
+    LOG("Lock state: %i (-1 UNKNOWN, 0 UNLOCKED, 1 LOCKED)", lockState);
     ss.setLockState(SS_SETLOCKSTATE_LOCK);
     LOG("Told SS to lock the front door..."); // need to impliment websocket to hear async if it worked
 }
