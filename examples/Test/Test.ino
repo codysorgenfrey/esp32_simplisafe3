@@ -13,6 +13,7 @@ TODO:
 #define LOG(message, ...) printf(">>> [%7d][%.2fkb] SimpliSafe: " message "\n", millis(), (esp_get_free_heap_size() * 0.001f), ##__VA_ARGS__)
 
 SimpliSafe3 ss;
+bool statusOk = false;
 
 void setup()
 {
@@ -26,16 +27,18 @@ void setup()
     }
     LOG("Connected to %s.", WIFI_SSID);
 
-    ss.setup();
-    
-    int alarmState = ss.getAlarmState();
-    LOG("Alarm state: %i (UNKNOWN,OFF,HOME,HOME_COUNT,AWAY,AWAY_COUNT,ALARM,ALARM_COUNT)", alarmState);
-    int lockState = ss.getLockState();
-    LOG("Lock state: %i (UNKNOWN,UNLOCKED,LOCKED)", lockState);
-    ss.setLockState(SS_SETLOCKSTATE_LOCK);
-    LOG("Told SS to lock the front door..."); // need to impliment websocket to hear async if it worked
+    statusOk = ss.setup();
+
+    // int alarmState = ss.getAlarmState();
+    // LOG("Alarm state: %i (UNKNOWN,OFF,HOME,HOME_COUNT,AWAY,AWAY_COUNT,ALARM,ALARM_COUNT)", alarmState);
+    // int lockState = ss.getLockState();
+    // LOG("Lock state: %i (UNKNOWN,UNLOCKED,LOCKED)", lockState);
+    // ss.setLockState(SS_SETLOCKSTATE_LOCK);
+    // LOG("Told SS to lock the front door..."); // need to impliment websocket to hear async if it worked
 }
 
 void loop(){
-    ss.loop();
+    if (statusOk) {
+        ss.loop();
+    }
 }

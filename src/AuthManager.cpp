@@ -174,6 +174,7 @@ bool SS3AuthManager::writeUserData() {
 }
 
 bool SS3AuthManager::readUserData() {
+    SS_LOG_LINE("Reading user data file.");
     if (!SPIFFS.begin(true)) {
         SS_LOG_LINE("Error starting SPIFFS.");
         return false;
@@ -200,7 +201,7 @@ bool SS3AuthManager::readUserData() {
     refreshToken = userData["refreshToken"].as<String>();
     codeVerifier = userData["codeVerifier"].as<String>();
 
-    SS_LOG_LINE("Found user data file...");
+    SS_LOG_LINE("Found...");
     #if SS_DEBUG
         serializeJsonPretty(userData, Serial);
         Serial.println("");
@@ -216,7 +217,9 @@ bool SS3AuthManager::readUserData() {
 //
 
 SS3AuthManager::SS3AuthManager() {
+    SS_LOG_LINE("Making Authorization Manager.");
     if(!readUserData()) {
+        SS_LOG_LINE("No previous data, generating codes.");
         uint8_t randData[32]; // 32 bytes, u_int8_t is 1 byte
         esp_fill_random(randData, SHA256_LEN);
         codeVerifier = base64URLEncode(randData);
@@ -282,7 +285,8 @@ DynamicJsonDocument SS3AuthManager::request(
     https->useHTTP10(true); // for ArduinoJson
 
     if (url.indexOf("https://auth") >= 0) client->setCACert(SS_OAUTH_CA_CERT);
-    else client->setInsecure(); // SEE IF OTHER CERTS WORK NOW
+    else if (url.indexOf("https://api") >= 0) client->setCACert(SS_API_CERT);
+    else client->setInsecure();
 
     if (!https->begin(*client, url)){
         SS_LOG_LINE("Could not connect to %s.", url.c_str());

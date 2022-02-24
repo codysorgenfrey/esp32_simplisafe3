@@ -3,7 +3,6 @@
 #include <ArduinoJson.h>
 #include "AuthManager.h"
 #include <WebSocketsClient.h>
-#include <SocketIOclient.h>
 
 const char* SS_GETSTATE_VALUES[8] = {
     "UNKNOWN",
@@ -48,6 +47,79 @@ String SimpliSafe3::getUserID() {
 }
 
 bool SimpliSafe3::startListening() {
+    SS_LOG_LINE("Starting WebSocket.");
+    String userIdLocal;
+    if (userId.length() == 0) {
+        userIdLocal = getUserID();
+        if (userIdLocal.length() == 0) {
+            SS_LOG_LINE("Cannot start WebSocket without userId.");
+            return false;
+        }
+    }
+    
+    socket.beginSslWithCA(SS_WEBSOCKET_URL, 443, "/", SS_API_CERT, "");
+    socket.onEvent([this, userIdLocal](WStype_t type, uint8_t * payload, size_t length) {
+        switch(type) {
+        case WStype_DISCONNECTED:
+            SS_LOG_LINE("Websocket Disconnected.");
+            break;
+        case WStype_CONNECTED:
+            SS_LOG_LINE("Websocket connected to url: %s",  payload);
+            break;
+        case WStype_TEXT: {
+                SS_LOG_LINE("Websocket got text: %s", payload);
+                DynamicJsonDocument res(2048);
+                DeserializationError err = deserializeJson(res, payload);
+                if (err) SS_LOG_LINE("Error deserializing websocket response: %s", err.c_str());
+
+                String type = res["type"];
+                // listen for hello, then send identify
+                if (type.equals("com.simplisafe.service.hello")) {
+                    SS_LOG_LINE("SimpliSafe says hello.");
+
+                    DynamicJsonDocument ident(2048);
+                    String identPayload;
+                    ident["datacontenttype"] = "application/json";
+                    ident["type"] = "com.simplisafe.connection.identify";
+                    ident["time"] = "2022-02-24T00:10:33.269Z";
+                    ident["id"] = "ts:1645661433269";
+                    ident["specversion"] = "1.0";
+                    ident["source"] = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/98.0.4758.102 Safari/537.36 Edg/98.0.1108.56",
+                    ident["data"]["auth"]["schema"] = "bearer";
+                    ident["data"]["auth"]["token"] = authManager->accessToken;
+                    ident["data"]["join"]["uid"] = userIdLocal;    
+                    serializeJson(ident, identPayload);
+
+                    if (!socket.sendTXT(identPayload)) {
+                        SS_LOG_LINE("Could not send identify message to websocket. %s", identPayload.c_str());
+                    }
+                }
+                // listen for registered
+                if (type.equals("com.simplisafe.service.registered")) SS_LOG_LINE("Websocket registered.");
+                
+                // listen for subscribed
+                if (type.equals("com.simplisafe.namespace.subscribed")) SS_LOG_LINE("Websocket subscribed.");
+                
+                // listen for events
+                if (type.equals("com.simplisafe.event.standard")) {
+                    SS_LOG_LINE("Event triggered: %s, %s", res["data"]["eventCid"], res["data"]["messageSubject"]);
+                }
+            }
+            break;
+        case WStype_BIN: {
+                SS_LOG_LINE("Websocket got binary length: %u", length);
+                // hexdump(payload, length);
+            }
+            break;
+		case WStype_ERROR:			
+		case WStype_FRAGMENT_TEXT_START:
+		case WStype_FRAGMENT_BIN_START:
+		case WStype_FRAGMENT:
+		case WStype_FRAGMENT_FIN:
+			break;
+    }
+    });
+
     return true;
 }
 
@@ -143,7 +215,9 @@ bool SimpliSafe3::setup(HardwareSerial *hwSerial, unsigned long baud) {
 }
 
 void SimpliSafe3::loop() {
-    // poll here for socketIO
+    // poll here for WebSocket
+    socket.loop();
+
     // check here for refreshing auth token
 }
 

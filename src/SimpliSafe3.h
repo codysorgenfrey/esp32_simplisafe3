@@ -8,6 +8,7 @@
 
 #include "AuthManager.h"
 #include <ArduinoJson.h>
+#include <WebSocketsClient.h>
 
 enum SS_GETSTATE {
     SS_GETSTATE_UNKNOWN = -1,
@@ -40,6 +41,7 @@ class SimpliSafe3 {
         String userId;
         String lockId;
         SS3AuthManager *authManager;
+        WebSocketsClient socket;
 
         bool startListening();
         String getUserID();

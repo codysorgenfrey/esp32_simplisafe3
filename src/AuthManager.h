@@ -14,8 +14,6 @@ class SS3AuthManager {
         String refreshToken;
         String codeVerifier;
         String codeChallenge;
-        String tokenType = "Bearer";
-        String accessToken;
         unsigned long tokenIssueMS;
         unsigned long expiresInMS;
 
@@ -29,6 +27,9 @@ class SS3AuthManager {
         bool readUserData();
 
     public:
+        String tokenType = "Bearer";
+        String accessToken;
+
         SS3AuthManager();
         bool isAuthorized();
         bool authorize(HardwareSerial *hwSerial, unsigned long baud);
