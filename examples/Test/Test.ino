@@ -1,9 +1,6 @@
 /*
 TODO:
-1. Get SocketIO working for callbacks
-2. Check and refresh token in loop()
-3. Copy Crypto library locally for change needed and restore global version
-4. Break into library package
+1. Check and refresh token in loop()
 */
 
 #include <WiFi.h>
@@ -28,13 +25,18 @@ void setup()
     LOG("Connected to %s.", WIFI_SSID);
 
     statusOk = ss.setup();
+    if (statusOk) {
+        statusOk = ss.startListeningToEvents([](int eventId) {
+            LOG("I got an event: %i", eventId);
+        });
+    }
 
-    // int alarmState = ss.getAlarmState();
-    // LOG("Alarm state: %i (UNKNOWN,OFF,HOME,HOME_COUNT,AWAY,AWAY_COUNT,ALARM,ALARM_COUNT)", alarmState);
-    // int lockState = ss.getLockState();
-    // LOG("Lock state: %i (UNKNOWN,UNLOCKED,LOCKED)", lockState);
-    // ss.setLockState(SS_SETLOCKSTATE_LOCK);
-    // LOG("Told SS to lock the front door..."); // need to impliment websocket to hear async if it worked
+    int alarmState = ss.getAlarmState();
+    LOG("Alarm state: %i (UNKNOWN,OFF,HOME,HOME_COUNT,AWAY,AWAY_COUNT,ALARM,ALARM_COUNT)", alarmState);
+    int lockState = ss.getLockState();
+    LOG("Lock state: %i (UNKNOWN,UNLOCKED,LOCKED)", lockState);
+    ss.setLockState(SS_SETLOCKSTATE_LOCK);
+    LOG("Told SS to lock the front door..."); // need to impliment websocket to hear async if it worked
 }
 
 void loop(){

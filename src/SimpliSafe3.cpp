@@ -3,6 +3,7 @@
 #include <ArduinoJson.h>
 #include "AuthManager.h"
 #include <WebSocketsClient.h>
+#include <time.h>
 
 const char* SS_GETSTATE_VALUES[8] = {
     "UNKNOWN",
@@ -46,7 +47,7 @@ String SimpliSafe3::getUserID() {
     return "";
 }
 
-bool SimpliSafe3::startListening() {
+bool SimpliSafe3::startListeningToEvents(void (*eventCallback)(int eventId)) {
     SS_LOG_LINE("Starting WebSocket.");
     String userIdLocal;
     if (userId.length() == 0) {
@@ -58,7 +59,7 @@ bool SimpliSafe3::startListening() {
     }
     
     socket.beginSslWithCA(SS_WEBSOCKET_URL, 443, "/", SS_API_CERT, "");
-    socket.onEvent([this, userIdLocal](WStype_t type, uint8_t * payload, size_t length) {
+    socket.onEvent([this, userIdLocal, eventCallback](WStype_t type, uint8_t * payload, size_t length) {
         switch(type) {
         case WStype_DISCONNECTED:
             SS_LOG_LINE("Websocket Disconnected.");
@@ -77,22 +78,44 @@ bool SimpliSafe3::startListening() {
                 if (type.equals("com.simplisafe.service.hello")) {
                     SS_LOG_LINE("SimpliSafe says hello.");
 
+                    configTime(SS_TIME_GMT_OFFSET, SS_DST_OFFSET, SS_NTP_SERVER);
+                    struct tm timeInfo;
+                    time_t now;
+                    getLocalTime(&timeInfo);
+                    time(&now);
+                    char isoDate[20];
+                    sprintf(
+                        isoDate,
+                        "%04i-%02i-%02iT%02i:%02i:%02i",
+                        timeInfo.tm_year + 1900,
+                        timeInfo.tm_mon + 1,
+                        timeInfo.tm_mday,
+                        timeInfo.tm_hour,
+                        timeInfo.tm_min,
+                        timeInfo.tm_sec
+                    );
+
                     DynamicJsonDocument ident(2048);
                     String identPayload;
                     ident["datacontenttype"] = "application/json";
                     ident["type"] = "com.simplisafe.connection.identify";
-                    ident["time"] = "2022-02-24T00:10:33.269Z";
-                    ident["id"] = "ts:1645661433269";
+                    ident["time"] = isoDate; // "YYYY-MM-DDTHH:MM:SS";
+                    ident["id"] = "ts:" + String(now);
                     ident["specversion"] = "1.0";
                     ident["source"] = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/98.0.4758.102 Safari/537.36 Edg/98.0.1108.56",
                     ident["data"]["auth"]["schema"] = "bearer";
                     ident["data"]["auth"]["token"] = authManager->accessToken;
-                    ident["data"]["join"]["uid"] = userIdLocal;    
+                    ident["data"]["join"][0] = "uid:" + userIdLocal;
                     serializeJson(ident, identPayload);
 
                     if (!socket.sendTXT(identPayload)) {
                         SS_LOG_LINE("Could not send identify message to websocket. %s", identPayload.c_str());
                     }
+                    SS_LOG_LINE("Sent:");
+                    #if SS_DEBUG
+                        serializeJsonPretty(ident, Serial);
+                        Serial.println("");
+                    #endif
                 }
                 // listen for registered
                 if (type.equals("com.simplisafe.service.registered")) SS_LOG_LINE("Websocket registered.");
@@ -103,6 +126,7 @@ bool SimpliSafe3::startListening() {
                 // listen for events
                 if (type.equals("com.simplisafe.event.standard")) {
                     SS_LOG_LINE("Event triggered: %s, %s", res["data"]["eventCid"], res["data"]["messageSubject"]);
+                    eventCallback(res["data"]["eventCid"]);
                 }
             }
             break;
@@ -202,12 +226,6 @@ bool SimpliSafe3::setup(HardwareSerial *hwSerial, unsigned long baud) {
     // get authorized for api calls
     if (!authManager->authorize(hwSerial, baud)) {
         SS_LOG_LINE("Failed to authorize with SimpliSafe.");
-        return false;
-    }
-
-    // set up socket to listen for api changes
-    if (!startListening()) {
-        SS_LOG_LINE("Error starting SocketIO.");
         return false;
     }
 

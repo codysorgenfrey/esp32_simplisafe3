@@ -1,9 +1,9 @@
 #ifndef __SSCOMMON_H__
 #define __SSCOMMON_H__
 
-#ifndef SS_DEBUG
-#define SS_DEBUG true
-#endif
+// #ifndef SS_DEBUG
+// #define SS_DEBUG true
+// #endif
 
 // API constants
 #define SS3API "https://api.simplisafe.com/v1"
@@ -17,6 +17,10 @@
 #define SS_WEBSOCKET_URL "socketlink.prd.aser.simplisafe.com"
 
 #define SS_USER_DATA_FILE "/SS_USER_DATA.json"
+
+#define SS_TIME_GMT_OFFSET -8 * 3600 // - 8 hours PST
+#define SS_DST_OFFSET 1 * 3600
+#define SS_NTP_SERVER "pool.ntp.org"
 
 // Logging
 #if SS_DEBUG
