@@ -130,7 +130,7 @@ bool SimpliSafe3::startListeningToEvents(void (*eventCallback)(int eventId), voi
                 
                 // listen for events
                 if (type.equals("com.simplisafe.event.standard")) {
-                    SS_LOG_LINE("Event triggered: %s, %s", res["data"]["eventCid"], res["data"]["messageSubject"]);
+                    SS_LOG_LINE("Event %i triggered, %s", res["data"]["eventCid"].as<int>(), res["data"]["messageSubject"].as<String>());
                     eventCallback(res["data"]["eventCid"]);
                 }
             }
