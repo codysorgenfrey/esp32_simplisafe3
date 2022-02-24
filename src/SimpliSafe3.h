@@ -112,7 +112,7 @@ class SimpliSafe3 {
         int  setAlarmState(int newState);
         int  getLockState();
         int  setLockState(int newState);
-        bool startListeningToEvents(void (*eventCallback)(int eventId));
+        bool startListeningToEvents(void (*eventCallback)(int eventId), void (*connectCallback)(), void (*disconnectCallback)());
 };
 
 #endif

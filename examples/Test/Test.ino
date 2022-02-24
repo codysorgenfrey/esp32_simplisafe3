@@ -26,9 +26,17 @@ void setup()
 
     statusOk = ss.setup();
     if (statusOk) {
-        statusOk = ss.startListeningToEvents([](int eventId) {
-            LOG("I got an event: %i", eventId);
-        });
+        statusOk = ss.startListeningToEvents(
+            [](int eventId) {
+                LOG("I got an event: %i", eventId);
+            },
+            []() {
+                LOG("Connected to event socket.");
+            },
+            []() {
+                LOG("Disconnected from event socket.");
+            }
+        );
     }
 
     int alarmState = ss.getAlarmState();

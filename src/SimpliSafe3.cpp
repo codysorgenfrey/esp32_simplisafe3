@@ -47,7 +47,7 @@ String SimpliSafe3::getUserID() {
     return "";
 }
 
-bool SimpliSafe3::startListeningToEvents(void (*eventCallback)(int eventId)) {
+bool SimpliSafe3::startListeningToEvents(void (*eventCallback)(int eventId), void (*connectCallback)(), void (*disconnectCallback)()) {
     SS_LOG_LINE("Starting WebSocket.");
     String userIdLocal;
     if (userId.length() == 0) {
@@ -59,10 +59,11 @@ bool SimpliSafe3::startListeningToEvents(void (*eventCallback)(int eventId)) {
     }
     
     socket.beginSslWithCA(SS_WEBSOCKET_URL, 443, "/", SS_API_CERT, "");
-    socket.onEvent([this, userIdLocal, eventCallback](WStype_t type, uint8_t * payload, size_t length) {
+    socket.onEvent([this, userIdLocal, eventCallback, connectCallback, disconnectCallback](WStype_t type, uint8_t * payload, size_t length) {
         switch(type) {
         case WStype_DISCONNECTED:
             SS_LOG_LINE("Websocket Disconnected.");
+            disconnectCallback();
             break;
         case WStype_CONNECTED:
             SS_LOG_LINE("Websocket connected to url: %s",  payload);
@@ -122,7 +123,10 @@ bool SimpliSafe3::startListeningToEvents(void (*eventCallback)(int eventId)) {
                 if (type.equals("com.simplisafe.service.registered")) SS_LOG_LINE("Websocket registered.");
                 
                 // listen for subscribed
-                if (type.equals("com.simplisafe.namespace.subscribed")) SS_LOG_LINE("Websocket subscribed.");
+                if (type.equals("com.simplisafe.namespace.subscribed")) {
+                    SS_LOG_LINE("Websocket subscribed.");
+                    connectCallback();
+                }
                 
                 // listen for events
                 if (type.equals("com.simplisafe.event.standard")) {
