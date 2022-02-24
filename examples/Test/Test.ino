@@ -1,8 +1,3 @@
-/*
-TODO:
-1. Check and refresh token in loop()
-*/
-
 #include <WiFi.h>
 #include "secrets.h"
 #include <SimpliSafe3.h>
