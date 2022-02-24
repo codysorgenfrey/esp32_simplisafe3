@@ -245,7 +245,7 @@ void SimpliSafe3::loop() {
     socket.loop();
 
     // refresh auth token
-    if (millis() % 1000 == 0) { // check every second
+    if (millis() % 60000 == 0) { // check every minute
         if (!authManager->isAuthorized()) authManager->authorize(inSerial, inBaud);
     }
 }

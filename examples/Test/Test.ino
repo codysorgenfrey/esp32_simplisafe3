@@ -7,7 +7,7 @@ TODO:
 #include "secrets.h"
 #include <SimpliSafe3.h>
 
-#define LOG(message, ...) printf(">>> [%7d][%.2fkb] SimpliSafe: " message "\n", millis(), (esp_get_free_heap_size() * 0.001f), ##__VA_ARGS__)
+#define LOG(message, ...) printf(">>> [%7d][%.2fkb] Test.ino: " message "\n", millis(), (esp_get_free_heap_size() * 0.001f), ##__VA_ARGS__)
 
 SimpliSafe3 ss;
 bool statusOk = false;
@@ -28,7 +28,7 @@ void setup()
     if (statusOk) {
         statusOk = ss.startListeningToEvents(
             [](int eventId) {
-                LOG("I got an event: %i", eventId);
+                LOG("I got a %i event.", eventId);
             },
             []() {
                 LOG("Connected to event socket.");
