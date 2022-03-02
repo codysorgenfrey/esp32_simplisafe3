@@ -63,7 +63,7 @@ bool SimpliSafe3::startListeningToEvents(void (*eventCallback)(int eventId), voi
         switch(type) {
         case WStype_DISCONNECTED:
             SS_LOG_LINE("Websocket Disconnected.");
-            disconnectCallback();
+            if (disconnectCallback) disconnectCallback();
             break;
         case WStype_CONNECTED:
             SS_LOG_LINE("Websocket connected to url: %s",  payload);
@@ -125,13 +125,13 @@ bool SimpliSafe3::startListeningToEvents(void (*eventCallback)(int eventId), voi
                 // listen for subscribed
                 if (type.equals("com.simplisafe.namespace.subscribed")) {
                     SS_LOG_LINE("Websocket subscribed.");
-                    connectCallback();
+                    if (connectCallback) connectCallback();
                 }
                 
                 // listen for events
                 if (type.equals("com.simplisafe.event.standard")) {
                     SS_LOG_LINE("Event %i triggered, %s", res["data"]["eventCid"].as<int>(), res["data"]["messageSubject"].as<String>());
-                    eventCallback(res["data"]["eventCid"]);
+                    if (eventCallback) eventCallback(res["data"]["eventCid"]);
                 }
             }
             break;
