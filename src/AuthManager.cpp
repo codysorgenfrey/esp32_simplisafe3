@@ -5,7 +5,7 @@
 #include <WiFiClientSecure.h>
 #include <ArduinoJson.h>
 #include <base64.h>
-#include "./Crypto/SHA256.h" // had to use local to change define for ESP32
+#include <SHA256.h> // had to change define for ESP32 to use default AES
 #include <SPIFFS.h>
 #include <time.h>
 
