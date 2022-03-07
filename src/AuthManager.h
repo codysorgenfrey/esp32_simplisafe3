@@ -2,15 +2,11 @@
 #define __SS3AUTHMANAGER_H__
 
 #include <ArduinoJson.h>
-#include <HTTPClient.h>
-#include <WiFiClientSecure.h>
 
 #define SHA256_LEN 32
 
 class SS3AuthManager {
     private:
-        HTTPClient *https;
-        WiFiClientSecure *client;
         String refreshToken;
         String codeVerifier;
         String codeChallenge;
