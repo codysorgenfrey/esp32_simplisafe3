@@ -72,7 +72,7 @@ bool SimpliSafe3::startListeningToEvents(void (*eventCallback)(int eventId), voi
                 SS_LOG_LINE("Websocket got text: %s", payload);
                 DynamicJsonDocument res(2048);
                 DeserializationError err = deserializeJson(res, payload);
-                if (err) SS_LOG_LINE("Error deserializing websocket response: %s", err.c_str());
+                if (err) SS_ERROR_LINE("Error deserializing websocket response: %s", err.c_str());
 
                 // listen for hello, then send identify
                 String type = res["type"];
@@ -110,7 +110,7 @@ bool SimpliSafe3::startListeningToEvents(void (*eventCallback)(int eventId), voi
                     serializeJson(ident, identPayload);
 
                     if (!socket.sendTXT(identPayload)) {
-                        SS_LOG_LINE("Could not send identify message to websocket. %s", identPayload.c_str());
+                        SS_ERROR_LINE("Could not send identify message to websocket. %s", identPayload.c_str());
                     }
                     SS_LOG_LINE("Sent:");
                     #if SS_DEBUG
@@ -272,7 +272,7 @@ int SimpliSafe3::getAlarmState() {
         }
     }
     
-    SS_LOG_LINE("Subscription doesn't have location or system.");
+    SS_ERROR_LINE("Subscription doesn't have location or system.");
     return SS_GETSTATE_UNKNOWN;
 }
 

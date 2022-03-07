@@ -140,6 +140,8 @@ bool SS3AuthManager::storeAuthToken(const DynamicJsonDocument &doc) {
 
 bool SS3AuthManager::writeUserData() {
     // store accessToken, codeVerifier, refreshToken here
+    bool success = true;
+
     DynamicJsonDocument userData(1536);
     SS_LOG_LINE("Created user data object");
 
@@ -147,83 +149,82 @@ bool SS3AuthManager::writeUserData() {
     userData["refreshToken"] = refreshToken;
     userData["codeVerifier"] = codeVerifier;
 
-    if (!SPIFFS.begin(true)) {
+    if (SPIFFS.begin(true)) {
+        File file = SPIFFS.open(SS_USER_DATA_FILE, "w");
+        if (file) {
+            if (serializeJson(userData, file) > 0) {
+                SS_LOG_LINE("Wrote to user data file.");
+            } else {
+                SS_ERROR_LINE("Failed to write data to %s.", SS_USER_DATA_FILE);
+                success = false;
+            }
+
+            file.close();
+        } else {
+            SS_ERROR_LINE("Failed to open %s.", SS_USER_DATA_FILE);
+            success = false;
+        }
+
+        SPIFFS.end();
+    } else {
         SS_ERROR_LINE("Error starting SPIFFS.");
-        return false;
+        success = false;
     }
 
-    File file = SPIFFS.open(SS_USER_DATA_FILE, "w");
-    if (!file) {
-        SS_ERROR_LINE("Failed to open %s.", SS_USER_DATA_FILE);
-        SPIFFS.end();
-        return false;
-    }
-
-    if (serializeJson(userData, file) == 0) {
-        SS_ERROR_LINE("Failed to write data to %s.", SS_USER_DATA_FILE);
-        file.close();
-        SPIFFS.end();
-        return false;
-    }
-
-    SS_LOG_LINE("Wrote to user data file.");
-
-    file.close();
-    SPIFFS.end();
-    return true;
+    return success;
 }
 
 bool SS3AuthManager::readUserData() {
     SS_LOG_LINE("Reading user data file.");
-    if (!SPIFFS.begin(true)) {
+
+    bool success = true;
+
+    if (SPIFFS.begin(true)) {
+        File file = SPIFFS.open(SS_USER_DATA_FILE, "r");
+        if (file) {
+            DynamicJsonDocument userData(1536);
+            DeserializationError err = deserializeJson(userData, file);
+            if (err) {
+                SS_ERROR_LINE("Error deserializing %s.", SS_USER_DATA_FILE);
+                SS_ERROR_LINE("%s", err.c_str());
+                success = false;
+            } else {
+                accessToken = userData["accessToken"].as<String>();
+                refreshToken = userData["refreshToken"].as<String>();
+                codeVerifier = userData["codeVerifier"].as<String>();
+
+                if (
+                    accessToken.equals("null") ||
+                    refreshToken.equals("null") ||
+                    codeVerifier.equals("null")
+                ) {
+                    SS_ERROR_LINE("Found file but contents are empty.");
+                    accessToken = "";
+                    refreshToken = "";
+                    codeVerifier = "";
+                    success = false;
+                }
+
+                SS_LOG_LINE("Found...");
+                #if SS_DEBUG >= SS_DEBUG_LEVEL_INFO
+                    serializeJsonPretty(userData, Serial);
+                    Serial.println("");
+                #endif
+            }
+
+            file.close();
+        } else {
+            SS_ERROR_LINE("Failed to open %s.", SS_USER_DATA_FILE);
+            success = false;
+        }
+
+        SPIFFS.end();
+    } else {
         SS_ERROR_LINE("Error starting SPIFFS.");
-        return false;
+        success = false;
     }
 
-    File file = SPIFFS.open(SS_USER_DATA_FILE, "r");
-    if (!file) {
-        SS_ERROR_LINE("Failed to open %s.", SS_USER_DATA_FILE);
-        SPIFFS.end();
-        return false;
-    }
-
-    DynamicJsonDocument userData(1536);
-    DeserializationError err = deserializeJson(userData, file);
-    if (err) {
-        SS_ERROR_LINE("Error deserializing %s.", SS_USER_DATA_FILE);
-        SS_ERROR_LINE("%s", err.c_str());
-        file.close();
-        SPIFFS.end();
-        return false;
-    }
-
-    accessToken = userData["accessToken"].as<String>();
-    refreshToken = userData["refreshToken"].as<String>();
-    codeVerifier = userData["codeVerifier"].as<String>();
-
-    if (
-        accessToken.equals("null") ||
-        refreshToken.equals("null") ||
-        codeVerifier.equals("null")
-    ) {
-        SS_ERROR_LINE("Found file but contents are empty.");
-        accessToken = "";
-        refreshToken = "";
-        codeVerifier = "";
-        file.close();
-        SPIFFS.end();
-        return false;
-    }
-
-    SS_LOG_LINE("Found...");
-    #if SS_DEBUG
-        serializeJsonPretty(userData, Serial);
-        Serial.println("");
-    #endif
-
-    file.close();
-    SPIFFS.end();
-    return true;
+    return success;
 }
 
 //
