@@ -148,19 +148,19 @@ bool SS3AuthManager::writeUserData() {
     userData["codeVerifier"] = codeVerifier;
 
     if (!SPIFFS.begin(true)) {
-        SS_LOG_LINE("Error starting SPIFFS.");
+        SS_ERROR_LINE("Error starting SPIFFS.");
         return false;
     }
 
     File file = SPIFFS.open(SS_USER_DATA_FILE, "w");
     if (!file) {
-        SS_LOG_LINE("Failed to open %s.", SS_USER_DATA_FILE);
+        SS_ERROR_LINE("Failed to open %s.", SS_USER_DATA_FILE);
         SPIFFS.end();
         return false;
     }
 
     if (serializeJson(userData, file) == 0) {
-        SS_LOG_LINE("Failed to write data to %s.", SS_USER_DATA_FILE);
+        SS_ERROR_LINE("Failed to write data to %s.", SS_USER_DATA_FILE);
         file.close();
         SPIFFS.end();
         return false;
@@ -176,13 +176,13 @@ bool SS3AuthManager::writeUserData() {
 bool SS3AuthManager::readUserData() {
     SS_LOG_LINE("Reading user data file.");
     if (!SPIFFS.begin(true)) {
-        SS_LOG_LINE("Error starting SPIFFS.");
+        SS_ERROR_LINE("Error starting SPIFFS.");
         return false;
     }
 
     File file = SPIFFS.open(SS_USER_DATA_FILE, "r");
     if (!file) {
-        SS_LOG_LINE("Failed to open %s.", SS_USER_DATA_FILE);
+        SS_ERROR_LINE("Failed to open %s.", SS_USER_DATA_FILE);
         SPIFFS.end();
         return false;
     }
@@ -190,8 +190,8 @@ bool SS3AuthManager::readUserData() {
     DynamicJsonDocument userData(1536);
     DeserializationError err = deserializeJson(userData, file);
     if (err) {
-        SS_LOG_LINE("Error deserializing %s.", SS_USER_DATA_FILE);
-        SS_LOG_LINE("%s", err.f_str());
+        SS_ERROR_LINE("Error deserializing %s.", SS_USER_DATA_FILE);
+        SS_ERROR_LINE("%s", err.c_str());
         file.close();
         SPIFFS.end();
         return false;
@@ -200,6 +200,20 @@ bool SS3AuthManager::readUserData() {
     accessToken = userData["accessToken"].as<String>();
     refreshToken = userData["refreshToken"].as<String>();
     codeVerifier = userData["codeVerifier"].as<String>();
+
+    if (
+        accessToken.equals("null") ||
+        refreshToken.equals("null") ||
+        codeVerifier.equals("null")
+    ) {
+        SS_ERROR_LINE("Found file but contents are empty.");
+        accessToken = "";
+        refreshToken = "";
+        codeVerifier = "";
+        file.close();
+        SPIFFS.end();
+        return false;
+    }
 
     SS_LOG_LINE("Found...");
     #if SS_DEBUG
@@ -243,7 +257,7 @@ bool SS3AuthManager::authorize(HardwareSerial *hwSerial, unsigned long baud) {
             SS_LOG_LINE("Successfully authorized Homekit with SimpliSafe.");
             return true;
         } else { 
-            SS_LOG_LINE("Error authorizing Homekit with Simplisafe.");
+            SS_ERROR_LINE("Error authorizing Homekit with Simplisafe.");
             return false;
         }
     }
@@ -271,11 +285,12 @@ DynamicJsonDocument SS3AuthManager::request(
     const DynamicJsonDocument &filter,
     const DeserializationOption::NestingLimit &nestingLimit
 ) {
-    StaticJsonDocument<0> doc;
-
     SS_LOG_LINE("Requesting: %s %s", post ? "POST" : "GET", url.c_str());
-    SS_LOG_LINE("Authorized: %s", auth ? "yes" : "no");
+    SS_LOG_LINE("Authori    zed: %s", auth ? "yes" : "no");
     SS_LOG_LINE("Payload: %s", payload.c_str());
+
+    DynamicJsonDocument doc(docSize);
+    SS_LOG_LINE("Created doc of %i size", docSize);
 
     if (WiFi.status() == WL_CONNECTED) {
         HTTPClient https;
@@ -315,9 +330,6 @@ DynamicJsonDocument SS3AuthManager::request(
 
             if (response >= 200 || response <= 299) {
                 SS_LOG_LINE("Response: %i", response);
-            
-                doc = DynamicJsonDocument(docSize);
-                SS_LOG_LINE("Created doc of %i size", docSize);
                 
                 DeserializationError err;
                 if (filter.size() != 0) err = deserializeJson(doc, https.getStream(), DeserializationOption::Filter(filter), nestingLimit);
@@ -325,7 +337,7 @@ DynamicJsonDocument SS3AuthManager::request(
                 
                 if (err) {
                     if (err == DeserializationError::EmptyInput) doc["response"] = response; // no json response
-                    else SS_LOG_LINE("API request deserialization error: %s", err.f_str());
+                    else SS_ERROR_LINE("API request deserialization error: %s", err.c_str());
                 } else {
                     SS_LOG_LINE("Desearialized stream.");
                     #if SS_DEBUG
@@ -334,17 +346,17 @@ DynamicJsonDocument SS3AuthManager::request(
                     #endif
                 }
             } else {
-                SS_LOG_LINE("Error, code: %i.", response);
-                SS_LOG_LINE("Response: %s", https->getString().c_str());
+                SS_ERROR_LINE("Error, code: %i.", response);
+                SS_ERROR_LINE("Response: %s", https.getString().c_str());
             }
         } else {
-            SS_LOG_LINE("Could not connect to %s.", url.c_str());
+            SS_ERROR_LINE("Could not connect to %s.", url.c_str());
         }
 
         client.stop();
         https.end();
     } else {
-        SS_LOG_LINE("Not connected to WiFi.");
+        SS_ERROR_LINE("Not connected to WiFi.");
     }
 
     return doc;

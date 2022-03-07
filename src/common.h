@@ -1,10 +1,6 @@
 #ifndef __SSCOMMON_H__
 #define __SSCOMMON_H__
 
-#ifndef SS_DEBUG
-#define SS_DEBUG false
-#endif
-
 // API constants
 #define SS3API "https://api.simplisafe.com/v1"
 #define SS_OAUTH "https://auth.simplisafe.com/oauth"
@@ -23,15 +19,6 @@
 #define SS_NTP_SERVER "pool.ntp.org"
 
 #define SS_REFRESH_BUFFER 300000 // 5 minutes
-
-// Logging
-#if SS_DEBUG
-#define SS_LOG(message, ...) printf(">>> [%7d][%.2fkb] SimpliSafe: " message , millis(), (esp_get_free_heap_size() * 0.001f), ##__VA_ARGS__)
-#define SS_LOG_LINE(message, ...) printf(">>> [%7d][%.2fkb] SimpliSafe: " message "\n", millis(), (esp_get_free_heap_size() * 0.001f), ##__VA_ARGS__)
-#else
-#define SS_LOG(message, ...)
-#define SS_LOG_LINE(message, ...)
-#endif
 
 #define SS_OAUTH_CA_CERT \
 "-----BEGIN CERTIFICATE-----\n\
@@ -91,5 +78,24 @@ xy16paq8U4Zt3VekyvggQQto8PT7dL5WXXp59fkdheMtlb71cZBDzI0fmgAKhynp\n\
 VSJYACPq4xJDKVtHCN2MQWplBqjlIapBtJUhlbl90TSrE9atvNziPTnNvT51cKEY\n\
 WQPJIrSPnNVeKtelttQKbfi3QBFGmh95DmK/D5fs4C8fF5Q=\n\
 -----END CERTIFICATE-----\n"
+
+// Logging
+#define SS_DEBUG_LEVEL_NONE -1
+#define SS_DEBUG_LEVEL_ERROR 0
+#define SS_DEBUG_LEVEL_INFO 1
+
+#define SS_DEBUG SS_DEBUG_LEVEL_ERROR
+
+#if SS_DEBUG >= SS_DEBUG_LEVEL_ERROR
+    #define SS_ERROR_LINE(message, ...) printf("ERR [%7lu][%.2fkb] SimpliSafe: " message "\n", millis(), (esp_get_free_heap_size() * 0.001f), ##__VA_ARGS__)
+#else
+    #define SS_ERROR_LINE(message, ...)
+#endif
+
+#if SS_DEBUG >= SS_DEBUG_LEVEL_INFO
+    #define SS_LOG_LINE(message, ...) printf(">>> [%7lu][%.2fkb] SimpliSafe: " message "\n", millis(), (esp_get_free_heap_size() * 0.001f), ##__VA_ARGS__)
+#else
+    #define SS_LOG_LINE(message, ...)
+#endif
 
 #endif

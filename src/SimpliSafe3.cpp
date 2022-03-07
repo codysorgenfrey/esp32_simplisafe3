@@ -43,7 +43,7 @@ String SimpliSafe3::getUserID() {
         return userId;
     }
 
-    SS_LOG_LINE("Error getting user ID.");
+    SS_ERROR_LINE("Error getting user ID.");
     return "";
 }
 
@@ -53,7 +53,7 @@ bool SimpliSafe3::startListeningToEvents(void (*eventCallback)(int eventId), voi
     if (userId.length() == 0) {
         userIdLocal = getUserID();
         if (userIdLocal.length() == 0) {
-            SS_LOG_LINE("Cannot start WebSocket without userId.");
+            SS_ERROR_LINE("Cannot start WebSocket without userId.");
             return false;
         }
     }
@@ -155,7 +155,7 @@ bool SimpliSafe3::startListeningToEvents(void (*eventCallback)(int eventId), voi
 DynamicJsonDocument SimpliSafe3::getSubscription() {
     String userIdStr = getUserID();
     if (userIdStr.length() == 0) {
-        SS_LOG_LINE("Error getting userId.");
+        SS_ERROR_LINE("Error getting userId.");
         return StaticJsonDocument<0>();
     }
 
@@ -177,7 +177,7 @@ DynamicJsonDocument SimpliSafe3::getSubscription() {
     );
 
     if (sub.size() == 0) {
-        SS_LOG_LINE("Error getting all subscriptions.");
+        SS_ERROR_LINE("Error getting all subscriptions.");
         return StaticJsonDocument<0>();
     }
 
@@ -233,7 +233,7 @@ bool SimpliSafe3::setup(HardwareSerial *hwSerial, unsigned long baud) {
 
     // get authorized for api calls
     if (!authManager->authorize(inSerial, inBaud)) {
-        SS_LOG_LINE("Failed to authorize with SimpliSafe.");
+        SS_ERROR_LINE("Failed to authorize with SimpliSafe.");
         return false;
     }
 
@@ -255,7 +255,7 @@ int SimpliSafe3::getAlarmState() {
     DynamicJsonDocument sub = getSubscription();
 
     if (sub.size() == 0) {
-        SS_LOG_LINE("Error getting subscription.");
+        SS_ERROR_LINE("Error getting subscription.");
         return SS_GETSTATE_UNKNOWN;
     }
 
