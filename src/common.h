@@ -18,7 +18,8 @@
 #define SS_DST_OFFSET 1 * 3600
 #define SS_NTP_SERVER "pool.ntp.org"
 
-#define SS_REFRESH_BUFFER 300000 // 5 minutes
+#define SS_AUTH_REFRESH_BUFFER 300000 // 5 minutes
+#define SS_AUTH_CHECK_INTERVAL 60000 // one minute
 
 #define SS_OAUTH_CA_CERT \
 "-----BEGIN CERTIFICATE-----\n\
@@ -83,8 +84,9 @@ WQPJIrSPnNVeKtelttQKbfi3QBFGmh95DmK/D5fs4C8fF5Q=\n\
 #define SS_DEBUG_LEVEL_NONE -1
 #define SS_DEBUG_LEVEL_ERROR 0
 #define SS_DEBUG_LEVEL_INFO 1
+#define SS_DEBUG_LEVEL_ALL 2
 
-#define SS_DEBUG SS_DEBUG_LEVEL_ERROR
+#define SS_DEBUG SS_DEBUG_LEVEL_INFO
 
 #if SS_DEBUG >= SS_DEBUG_LEVEL_ERROR
     #define SS_ERROR_LINE(message, ...) printf("ERR [%7lu][%.2fkb] SimpliSafe: " message "\n", millis(), (esp_get_free_heap_size() * 0.001f), ##__VA_ARGS__)
@@ -96,6 +98,12 @@ WQPJIrSPnNVeKtelttQKbfi3QBFGmh95DmK/D5fs4C8fF5Q=\n\
     #define SS_LOG_LINE(message, ...) printf(">>> [%7lu][%.2fkb] SimpliSafe: " message "\n", millis(), (esp_get_free_heap_size() * 0.001f), ##__VA_ARGS__)
 #else
     #define SS_LOG_LINE(message, ...)
+#endif
+
+#if SS_DEBUG >= SS_DEBUG_LEVEL_ALL
+    #define SS_DETAIL_LINE(message, ...) printf(">>> [%7lu][%.2fkb] SimpliSafe: " message "\n", millis(), (esp_get_free_heap_size() * 0.001f), ##__VA_ARGS__)
+#else
+    #define SS_DETAIL_LINE(message, ...)
 #endif
 
 #endif

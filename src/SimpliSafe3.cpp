@@ -5,8 +5,7 @@
 #include <WebSocketsClient.h>
 #include <time.h>
 
-const char* SS_GETSTATE_VALUES[8] = {
-    "UNKNOWN",
+const char* SS_GETSTATE_VALUES[7] = {
     "OFF",
     "HOME",
     "HOME_COUNT",
@@ -20,7 +19,8 @@ const char* SS_SETSTATE_VALUES[3] = {
     "home",
     "away"
 };
-const char* SS_SETLOCKSTATE_VALUES[2] = {
+
+const char* SS_LOCKSTATE_VALUES[2] = {
     "unlock",
     "lock"
 };
@@ -30,9 +30,9 @@ const char* SS_SETLOCKSTATE_VALUES[2] = {
 //
 
 String SimpliSafe3::getUserID() {
-    SS_LOG_LINE("Getting user ID");
+    SS_LOG_LINE("Getting user ID.");
     if (userId.length() != 0) {
-        SS_LOG_LINE("Already had userID");
+        SS_LOG_LINE("User ID already exists.");
         return userId;
     }
 
@@ -62,14 +62,14 @@ bool SimpliSafe3::startListeningToEvents(void (*eventCallback)(int eventId), voi
     socket.onEvent([this, userIdLocal, eventCallback, connectCallback, disconnectCallback](WStype_t type, uint8_t * payload, size_t length) {
         switch(type) {
         case WStype_DISCONNECTED:
-            SS_LOG_LINE("Websocket Disconnected.");
+            SS_DETAIL_LINE("Websocket Disconnected.");
             if (disconnectCallback) disconnectCallback();
             break;
         case WStype_CONNECTED:
-            SS_LOG_LINE("Websocket connected to url: %s",  payload);
+            SS_DETAIL_LINE("Websocket connected to url: %s",  payload);
             break;
         case WStype_TEXT: {
-                SS_LOG_LINE("Websocket got text: %s", payload);
+                SS_DETAIL_LINE("Websocket got text: %s", payload);
                 DynamicJsonDocument res(2048);
                 DeserializationError err = deserializeJson(res, payload);
                 if (err) SS_ERROR_LINE("Error deserializing websocket response: %s", err.c_str());
@@ -77,7 +77,7 @@ bool SimpliSafe3::startListeningToEvents(void (*eventCallback)(int eventId), voi
                 // listen for hello, then send identify
                 String type = res["type"];
                 if (type.equals("com.simplisafe.service.hello")) {
-                    SS_LOG_LINE("SimpliSafe says hello.");
+                    SS_DETAIL_LINE("SimpliSafe says hello.");
 
                     struct tm timeInfo;
                     time_t now;
@@ -112,8 +112,8 @@ bool SimpliSafe3::startListeningToEvents(void (*eventCallback)(int eventId), voi
                     if (!socket.sendTXT(identPayload)) {
                         SS_ERROR_LINE("Could not send identify message to websocket. %s", identPayload.c_str());
                     }
-                    SS_LOG_LINE("Sent:");
-                    #if SS_DEBUG
+                    SS_DETAIL_LINE("Sent:");
+                    #if SS_DEBUG >= SS_DEBUG_LEVEL_ALL
                         serializeJsonPretty(ident, Serial);
                         inSerial->println("");
                     #endif
@@ -124,19 +124,19 @@ bool SimpliSafe3::startListeningToEvents(void (*eventCallback)(int eventId), voi
                 
                 // listen for subscribed
                 if (type.equals("com.simplisafe.namespace.subscribed")) {
-                    SS_LOG_LINE("Websocket subscribed.");
+                    SS_DETAIL_LINE("Websocket subscribed.");
                     if (connectCallback) connectCallback();
                 }
                 
                 // listen for events
                 if (type.equals("com.simplisafe.event.standard")) {
-                    SS_LOG_LINE("Event %i triggered, %s", res["data"]["eventCid"].as<int>(), res["data"]["messageSubject"].as<String>());
+                    SS_DETAIL_LINE("Event %i triggered, %s", res["data"]["eventCid"].as<int>(), res["data"]["messageSubject"].as<String>());
                     if (eventCallback) eventCallback(res["data"]["eventCid"]);
                 }
             }
             break;
         case WStype_BIN: {
-                SS_LOG_LINE("Websocket got binary length: %u", length);
+                SS_DETAIL_LINE("Websocket got binary length: %u", length);
                 // hexdump(payload, length);
             }
             break;
@@ -153,6 +153,7 @@ bool SimpliSafe3::startListeningToEvents(void (*eventCallback)(int eventId), voi
 }
 
 DynamicJsonDocument SimpliSafe3::getSubscription() {
+    SS_LOG_LINE("Getting subscription.");
     String userIdStr = getUserID();
     if (userIdStr.length() == 0) {
         SS_ERROR_LINE("Error getting userId.");
@@ -164,7 +165,6 @@ DynamicJsonDocument SimpliSafe3::getSubscription() {
     filter["subscriptions"][0]["location"]["system"]["alarmState"] = true;
     filter["subscriptions"][0]["location"]["system"]["isAlarming"] = true;
 
-    SS_LOG_LINE("Getting first subscription.");
     DynamicJsonDocument sub = authManager->request(
         String(SS3API) + "/users/"+userIdStr+"/subscriptions?activeOnly=true", 
         256, 
@@ -181,9 +181,9 @@ DynamicJsonDocument SimpliSafe3::getSubscription() {
         return StaticJsonDocument<0>();
     }
 
-        // TODO: Handle other situations
+    // TODO: Handle other situations
     subId = String(sub["subscriptions"][0]["sid"].as<int>());
-    SS_LOG_LINE("Set subId %s.", subId.c_str());
+    SS_LOG_LINE("Got subscription. ID: %s.", subId.c_str());
 
     return sub["subscriptions"][0];
 }
@@ -212,9 +212,11 @@ DynamicJsonDocument SimpliSafe3::getLock() {
 
     if (data.size() > 0) {
         lockId = data[0]["serial"].as<String>();
+        SS_LOG_LINE("Got lock. ID: %s", lockId.c_str());
         return data[0];
     }
 
+    SS_ERROR_LINE("Error getting lock ID.");
     return StaticJsonDocument<0>();
 }
 
@@ -228,6 +230,7 @@ SimpliSafe3::SimpliSafe3() {
 }
 
 bool SimpliSafe3::setup(HardwareSerial *hwSerial, unsigned long baud) {
+    SS_LOG_LINE("Setting up SimpliSafe.");
     inSerial = hwSerial;
     inBaud = baud;
 
@@ -245,8 +248,16 @@ void SimpliSafe3::loop() {
     socket.loop();
 
     // refresh auth token
-    if (millis() % 60000 == 0) { // check every minute
-        if (!authManager->isAuthorized()) authManager->authorize(inSerial, inBaud);
+    const unsigned long now = millis();
+    const unsigned long diff = max(now, lastAuthCheck) - min(now, lastAuthCheck);
+    if (diff >= SS_AUTH_CHECK_INTERVAL) {
+        if (!authManager->isAuthorized()) {
+            if (!authManager->authorize(inSerial, inBaud)) {
+                SS_ERROR_LINE("Error refreshing authorization token.");
+            }
+        }
+
+        lastAuthCheck = now;
     }
 }
 
@@ -266,8 +277,9 @@ int SimpliSafe3::getAlarmState() {
         const char *resState = sub["location"]["system"]["alarmState"].as<const char*>();                
         for (int x = 0; x < sizeof(SS_GETSTATE_VALUES) / sizeof(SS_GETSTATE_VALUES[0]); x++) {
             if (strcmp(resState, SS_GETSTATE_VALUES[x]) == 0) {
-                SS_LOG_LINE("Found %s at index %i.", resState, x);
-                return x - 1;
+                SS_DETAIL_LINE("Found state at index %i.", x);
+                SS_LOG_LINE("Got alarm state: %s", SS_GETSTATE_VALUES[x]);
+                return x;
             }
         }
     }
@@ -294,17 +306,19 @@ int SimpliSafe3::setAlarmState(int newState) {
         const char *resState = data["state"].as<const char *>();
         for (int x = 0; x < sizeof(SS_GETSTATE_VALUES) / sizeof(SS_GETSTATE_VALUES[0]); x++) {
             if (strcmp(resState, SS_GETSTATE_VALUES[x]) == 0) {
-                SS_LOG_LINE("Found %s at index %i.", resState, x);
-                return x - 1;
+                SS_DETAIL_LINE("Found state at index %i.", x);
+                SS_LOG_LINE("Set alarm state to %s", SS_GETSTATE_VALUES[x]);
+                return x;
             }
         }
     }
 
+    SS_ERROR_LINE("Error setting alarm state.");
     return SS_GETSTATE_UNKNOWN;
 }
 
 int SimpliSafe3::getLockState() {
-    SS_LOG_LINE("Get lock state.");
+    SS_LOG_LINE("Getting lock state.");
 
     if (subId.length() == 0) {
         getSubscription();
@@ -313,9 +327,12 @@ int SimpliSafe3::getLockState() {
     DynamicJsonDocument lock = getLock();
 
     if (lock.size() > 0) {
-        return lock["status"]["lockState"].as<int>();
+        int resState = lock["status"]["lockState"].as<int>();
+        SS_LOG_LINE("Got lock state: %s", SS_LOCKSTATE_VALUES[resState]);
+        return resState;
     }
 
+    SS_ERROR_LINE("Error getting lock state.");
     return SS_GETLOCKSTATE_UNKNOWN;
 }
 
@@ -336,7 +353,7 @@ int SimpliSafe3::setLockState(int newState) {
 
     StaticJsonDocument<96> payloadDoc;
     String payload;
-    payloadDoc["state"] = SS_SETLOCKSTATE_VALUES[newState];
+    payloadDoc["state"] = SS_LOCKSTATE_VALUES[newState];
     serializeJson(payloadDoc, payload);
 
     DynamicJsonDocument data = authManager->request(
@@ -349,8 +366,10 @@ int SimpliSafe3::setLockState(int newState) {
     );
 
     if (data.size() > 0) {
+        SS_LOG_LINE("Set lock state to %s", SS_LOCKSTATE_VALUES[newState]);
         return newState; // api is async and doesn't tell us if it worked
     }
 
+    SS_ERROR_LINE("Error setting lock state.");
     return SS_GETLOCKSTATE_UNKNOWN;
 }

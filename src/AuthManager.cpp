@@ -37,6 +37,7 @@ class AllowAllFilter : ArduinoJson6191_F1::Filter {
 //
 
 String SS3AuthManager::base64URLEncode(uint8_t *buffer) {
+    SS_LOG_LINE("Base64 URL encoding.");
     base64 bs;
     String str = bs.encode(buffer, SHA256_LEN);
 
@@ -48,6 +49,7 @@ String SS3AuthManager::base64URLEncode(uint8_t *buffer) {
 }
 
 void SS3AuthManager::sha256(const char *inBuff, uint8_t *outBuff) {
+    SS_LOG_LINE("Doing SHA256.");
     SHA256 hash;
     hash.reset();
     hash.update(inBuff, strlen(inBuff));
@@ -55,8 +57,9 @@ void SS3AuthManager::sha256(const char *inBuff, uint8_t *outBuff) {
 }
 
 String SS3AuthManager::getSS3AuthURL() {
-    SS_LOG_LINE("Code Verifier:     %s", codeVerifier.c_str());
-    SS_LOG_LINE("Code Challenge:    %s", codeChallenge.c_str());    
+    SS_LOG_LINE("Getting authorization URL.");
+    SS_DETAIL_LINE("Code Verifier:  %s", codeVerifier.c_str());
+    SS_DETAIL_LINE("Code Challenge: %s", codeChallenge.c_str());    
     String ecnodedRedirect = String(SS_OAUTH_REDIRECT_URI);
     ecnodedRedirect.replace(":", "%3A");
     ecnodedRedirect.replace("/", "%2F");
@@ -73,6 +76,7 @@ String SS3AuthManager::getSS3AuthURL() {
 }
 
 bool SS3AuthManager::getAuthToken(String code) {
+    SS_LOG_LINE("Getting authorization tokens.");
     StaticJsonDocument<256> headers;
     headers[0]["name"] = "Host";
     headers[0]["value"] = "auth.simplisafe.com";
@@ -96,13 +100,17 @@ bool SS3AuthManager::getAuthToken(String code) {
     
     DynamicJsonDocument res = request(SS_OAUTH + String("/token"), 3072, false, true, payload, headers);
 
-    if (res.size() != 0)
+    if (res.size() != 0) {
+        SS_LOG_LINE("Got authorization tokens.");
         return storeAuthToken(res);
-    else
-        return false;
+    }
+
+    SS_ERROR_LINE("Error getting authorization tokens.");
+    return false;
 }
 
 bool SS3AuthManager::refreshAuthToken() {
+    SS_LOG_LINE("Getting refresh token.");
     StaticJsonDocument<256> headers;
     headers[0]["name"] = "Host";
     headers[0]["value"] = "auth.simplisafe.com";
@@ -122,29 +130,42 @@ bool SS3AuthManager::refreshAuthToken() {
 
     DynamicJsonDocument res = request(SS_OAUTH + String("/token"), 3072, false, true, payload, headers);
 
-    if (res.size() != 0)
+    if (res.size() != 0) {
+        SS_LOG_LINE("Got refresh token.");
         return storeAuthToken(res);
-    else
-        return false;
+    }
+    
+    SS_ERROR_LINE("Error getting refresh token.");
+    return false;
 }
 
 bool SS3AuthManager::storeAuthToken(const DynamicJsonDocument &doc) {
+    SS_LOG_LINE("Storing authorization tokens.");
     accessToken = doc["access_token"].as<String>();
     refreshToken = doc["refresh_token"].as<String>();
     tokenType = doc["token_type"].as<String>();
     tokenIssueMS = millis();
     expiresInMS = doc["expires_in"].as<unsigned long>() * 1000;
 
-    return writeUserData();
+    if (
+        !accessToken.equals("null") &&
+        !refreshToken.equals("null") &&
+        !tokenType.equals("null") &&
+        expiresInMS != 0
+    ) {
+        SS_LOG_LINE("Stored authorization tokens.");
+        return writeUserData();
+    }
+
+    SS_ERROR_LINE("Error storing authorization tokens.");
+    return false;
 }
 
 bool SS3AuthManager::writeUserData() {
-    // store accessToken, codeVerifier, refreshToken here
+    SS_LOG_LINE("Writing authorization tokens to file.");
     bool success = true;
 
     DynamicJsonDocument userData(1536);
-    SS_LOG_LINE("Created user data object");
-
     userData["accessToken"] = accessToken;
     userData["refreshToken"] = refreshToken;
     userData["codeVerifier"] = codeVerifier;
@@ -153,7 +174,7 @@ bool SS3AuthManager::writeUserData() {
         File file = SPIFFS.open(SS_USER_DATA_FILE, "w");
         if (file) {
             if (serializeJson(userData, file) > 0) {
-                SS_LOG_LINE("Wrote to user data file.");
+                SS_LOG_LINE("Wrote authorization tokens to file.");
             } else {
                 SS_ERROR_LINE("Failed to write data to %s.", SS_USER_DATA_FILE);
                 success = false;
@@ -175,8 +196,7 @@ bool SS3AuthManager::writeUserData() {
 }
 
 bool SS3AuthManager::readUserData() {
-    SS_LOG_LINE("Reading user data file.");
-
+    SS_LOG_LINE("Reading authorization tokens from file.");
     bool success = true;
 
     if (SPIFFS.begin(true)) {
@@ -205,8 +225,8 @@ bool SS3AuthManager::readUserData() {
                     success = false;
                 }
 
-                SS_LOG_LINE("Found...");
-                #if SS_DEBUG >= SS_DEBUG_LEVEL_INFO
+                SS_LOG_LINE("Read authorization tokens from file.");
+                #if SS_DEBUG >= SS_DEBUG_LEVEL_ALL
                     serializeJsonPretty(userData, Serial);
                     Serial.println("");
                 #endif
@@ -234,7 +254,7 @@ bool SS3AuthManager::readUserData() {
 SS3AuthManager::SS3AuthManager() {
     SS_LOG_LINE("Making Authorization Manager.");
     if(!readUserData()) {
-        SS_LOG_LINE("No previous data, generating codes.");
+        SS_LOG_LINE("No previous authorization tokens, generating codes.");
         uint8_t randData[32]; // 32 bytes, u_int8_t is 1 byte
         esp_fill_random(randData, SHA256_LEN);
         codeVerifier = base64URLEncode(randData);
@@ -246,19 +266,21 @@ SS3AuthManager::SS3AuthManager() {
 }
 
 bool SS3AuthManager::authorize(HardwareSerial *hwSerial, unsigned long baud) {
+    SS_LOG_LINE("Authorizing.");
     if (refreshToken.length() == 0) {
-        SS_LOG_LINE("Get that damn URL code:");
-        SS_LOG_LINE("%s", getSS3AuthURL().c_str());
         if (!hwSerial) hwSerial->begin(baud);
+        while (!hwSerial) { ; }
+        hwSerial->println("Get that damn URL code:");
+        hwSerial->println(getSS3AuthURL().c_str());
         while (hwSerial->available() > 0) { hwSerial->read(); } // flush serial monitor
         while (hwSerial->available() == 0) { delay(100); } // wait for url input
         String code = hwSerial->readString();
         hwSerial->println();
         if (getAuthToken(code)) {
-            SS_LOG_LINE("Successfully authorized Homekit with SimpliSafe.");
+            SS_LOG_LINE("Successfully authorized with SimpliSafe.");
             return true;
         } else { 
-            SS_ERROR_LINE("Error authorizing Homekit with Simplisafe.");
+            SS_ERROR_LINE("Error authorizing with Simplisafe.");
             return false;
         }
     }
@@ -267,13 +289,14 @@ bool SS3AuthManager::authorize(HardwareSerial *hwSerial, unsigned long baud) {
 }
 
 bool SS3AuthManager::isAuthorized() {
-    SS_LOG_LINE("Issue: %u, expires: %u", tokenIssueMS, expiresInMS);
+    SS_LOG_LINE("Checking if authorized...");
     if (tokenIssueMS == -1 || expiresInMS == -1) return false;
 
     unsigned long now = millis();
     unsigned long timeElapsed = max(now, tokenIssueMS) - min(now, tokenIssueMS);
-    SS_LOG_LINE("time elapsed: %u < %u && refresh token: %s", timeElapsed, expiresInMS - SS_REFRESH_BUFFER, refreshToken.length() != 0 ? "true" : "false");
-    return timeElapsed < (expiresInMS - SS_REFRESH_BUFFER) && refreshToken.length() != 0;
+    bool authorized = timeElapsed < (expiresInMS - SS_AUTH_REFRESH_BUFFER) && refreshToken.length() != 0;
+    SS_LOG_LINE("%s", authorized ? "Authorized." : "Not authorized.");
+    return authorized;
 }
 
 DynamicJsonDocument SS3AuthManager::request(
@@ -286,12 +309,13 @@ DynamicJsonDocument SS3AuthManager::request(
     const DynamicJsonDocument &filter,
     const DeserializationOption::NestingLimit &nestingLimit
 ) {
-    SS_LOG_LINE("Requesting: %s %s", post ? "POST" : "GET", url.c_str());
-    SS_LOG_LINE("Authori    zed: %s", auth ? "yes" : "no");
-    SS_LOG_LINE("Payload: %s", payload.c_str());
+    SS_LOG_LINE("Making a request.");
+    SS_DETAIL_LINE("Requesting: %s %s", post ? "POST" : "GET", url.c_str());
+    SS_DETAIL_LINE("Authori    zed: %s", auth ? "yes" : "no");
+    SS_DETAIL_LINE("Payload: %s", payload.c_str());
 
     DynamicJsonDocument doc(docSize);
-    SS_LOG_LINE("Created doc of %i size", docSize);
+    SS_DETAIL_LINE("Created doc of %i size", docSize);
 
     if (WiFi.status() == WL_CONNECTED) {
         HTTPClient https;
@@ -304,18 +328,18 @@ DynamicJsonDocument SS3AuthManager::request(
 
         if (https.begin(client, url)){
             if (auth) {
-                SS_LOG_LINE("Setting auth creds.");
+                SS_DETAIL_LINE("Setting authorization credentials.");
                 https.setAuthorization(""); // clear it out
                 https.addHeader("Authorization", tokenType + " " + accessToken);
             }
 
             if (headers.size() != 0) {
-                SS_LOG_LINE("Headers is bigger than 0.");
+                SS_DETAIL_LINE("Detected headers.");
                 for (int x = 0; x < headers.size(); x++) {
-                    SS_LOG_LINE("Adding %i header.", x);
+                    SS_DETAIL_LINE("Adding header %i.", x);
                     https.addHeader(headers[x]["name"], headers[x]["value"]);
-                    SS_LOG_LINE(
-                        "Header added... %s: %s", 
+                    SS_DETAIL_LINE(
+                        "Added header: \"%s: %s\"", 
                         headers[x]["name"].as<const char*>(), 
                         headers[x]["value"].as<const char*>()
                     );
@@ -327,21 +351,21 @@ DynamicJsonDocument SS3AuthManager::request(
                 response = https.POST(payload);
             else
                 response = https.GET();
-            SS_LOG_LINE("Request sent.");
+            SS_DETAIL_LINE("Request sent.");
 
             if (response >= 200 || response <= 299) {
-                SS_LOG_LINE("Response: %i", response);
+                SS_DETAIL_LINE("Response: %i", response);
                 
                 DeserializationError err;
-                if (filter.size() != 0) err = deserializeJson(doc, https.getStream(), DeserializationOption::Filter(filter), nestingLimit);
-                else err = deserializeJson(doc, https.getStream(), nestingLimit);
+                if (filter.size() != 0) err = deserializeJson(doc, client, DeserializationOption::Filter(filter), nestingLimit);
+                else err = deserializeJson(doc, client, nestingLimit);
                 
                 if (err) {
                     if (err == DeserializationError::EmptyInput) doc["response"] = response; // no json response
                     else SS_ERROR_LINE("API request deserialization error: %s", err.c_str());
                 } else {
-                    SS_LOG_LINE("Desearialized stream.");
-                    #if SS_DEBUG
+                    SS_DETAIL_LINE("Desearialized stream to json.");
+                    #if SS_DEBUG >= SS_DEBUG_LEVEL_ALL
                         serializeJsonPretty(doc, Serial);
                         Serial.println("");
                     #endif
