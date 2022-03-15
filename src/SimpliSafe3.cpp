@@ -32,14 +32,14 @@ const char* SS_LOCKSTATE_VALUES[2] = {
 String SimpliSafe3::getUserID() {
     SS_LOG_LINE("Getting user ID.");
     if (userId.length() != 0) {
-        SS_LOG_LINE("User ID already exists.");
+        SS_LOG_LINE("User ID %s already exists.", userId.c_str());
         return userId;
     }
 
     DynamicJsonDocument data = authManager->request(String(SS3API) + "/api/authCheck", 64);
     if (data.size() > 0) {
         userId = data["userId"].as<String>();
-
+        SS_LOG_LINE("Got user ID %s.", userId.c_str());
         return userId;
     }
 
@@ -183,7 +183,7 @@ DynamicJsonDocument SimpliSafe3::getSubscription() {
 
     // TODO: Handle other situations
     subId = String(sub["subscriptions"][0]["sid"].as<int>());
-    SS_LOG_LINE("Got subscription. ID: %s.", subId.c_str());
+    SS_LOG_LINE("Got subscription ID %s.", subId.c_str());
 
     return sub["subscriptions"][0];
 }
@@ -212,7 +212,7 @@ DynamicJsonDocument SimpliSafe3::getLock() {
 
     if (data.size() > 0) {
         lockId = data[0]["serial"].as<String>();
-        SS_LOG_LINE("Got lock. ID: %s", lockId.c_str());
+        SS_LOG_LINE("Got lock ID %s.", lockId.c_str());
         return data[0];
     }
 

@@ -347,15 +347,11 @@ DynamicJsonDocument SS3AuthManager::request(
             }
 
             int response;
-            if (post)
-                response = https.POST(payload);
-            else
-                response = https.GET();
-            SS_DETAIL_LINE("Request sent.");
+            if (post) response = https.POST(payload);
+            else response = https.GET();
+            SS_DETAIL_LINE("Request sent. Response: %i", response);
 
-            if (response >= 200 || response <= 299) {
-                SS_DETAIL_LINE("Response: %i", response);
-                
+            if (response >= 200 && response <= 299) {
                 DeserializationError err;
                 if (filter.size() != 0) err = deserializeJson(doc, client, DeserializationOption::Filter(filter), nestingLimit);
                 else err = deserializeJson(doc, client, nestingLimit);
@@ -374,15 +370,11 @@ DynamicJsonDocument SS3AuthManager::request(
                 SS_ERROR_LINE("Error, code: %i.", response);
                 SS_ERROR_LINE("Response: %s", https.getString().c_str());
             }
-        } else {
-            SS_ERROR_LINE("Could not connect to %s.", url.c_str());
-        }
 
-        client.stop();
-        https.end();
-    } else {
-        SS_ERROR_LINE("Not connected to WiFi.");
-    }
+            client.stop();
+            https.end();
+        } else SS_ERROR_LINE("Could not connect to %s.", url.c_str());
+    } else SS_ERROR_LINE("Not connected to WiFi.");
 
     return doc;
 }
