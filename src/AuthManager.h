@@ -29,9 +29,9 @@ class SS3AuthManager {
         SS3AuthManager();
         bool authorize(HardwareSerial *hwSerial, unsigned long baud);
         bool isAuthorized();
-        DynamicJsonDocument request(
+        int request(
             String url, 
-            int docSize = 3072, 
+            JsonDocument &doc, 
             bool auth = true, 
             bool post = false, 
             String payload = "", 

@@ -36,8 +36,9 @@ String SimpliSafe3::getUserID() {
         return userId;
     }
 
-    DynamicJsonDocument data = authManager->request(String(SS3API) + "/api/authCheck", 64);
-    if (data.size() > 0) {
+    StaticJsonDocument<64> data; 
+    int res = authManager->request(String(SS3API) + "/api/authCheck", data);
+    if (res >= 200 && res <= 299) {
         userId = data["userId"].as<String>();
         SS_LOG_LINE("Got user ID %s.", userId.c_str());
         return userId;
@@ -152,7 +153,7 @@ bool SimpliSafe3::startListeningToEvents(void (*eventCallback)(int eventId), voi
     return true;
 }
 
-DynamicJsonDocument SimpliSafe3::getSubscription() {
+StaticJsonDocument<256> SimpliSafe3::getSubscription() {
     SS_LOG_LINE("Getting subscription.");
     String userIdStr = getUserID();
     if (userIdStr.length() == 0) {
@@ -165,9 +166,10 @@ DynamicJsonDocument SimpliSafe3::getSubscription() {
     filter["subscriptions"][0]["location"]["system"]["alarmState"] = true;
     filter["subscriptions"][0]["location"]["system"]["isAlarming"] = true;
 
-    DynamicJsonDocument sub = authManager->request(
+    StaticJsonDocument<256> sub;
+    int res = authManager->request(
         String(SS3API) + "/users/"+userIdStr+"/subscriptions?activeOnly=true", 
-        256, 
+        sub, 
         true,
         false,
         "",
@@ -176,19 +178,19 @@ DynamicJsonDocument SimpliSafe3::getSubscription() {
         DeserializationOption::NestingLimit(11)
     );
 
-    if (sub.size() == 0) {
-        SS_ERROR_LINE("Error getting all subscriptions.");
-        return StaticJsonDocument<0>();
+    if (res >= 200 && res <= 299) {
+        // TODO: Handle other situations
+        subId = String(sub["subscriptions"][0]["sid"].as<int>());
+        SS_LOG_LINE("Got subscription ID %s.", subId.c_str());
+
+        return sub["subscriptions"][0];
     }
 
-    // TODO: Handle other situations
-    subId = String(sub["subscriptions"][0]["sid"].as<int>());
-    SS_LOG_LINE("Got subscription ID %s.", subId.c_str());
-
-    return sub["subscriptions"][0];
+    SS_ERROR_LINE("Error getting all subscriptions.");
+    return StaticJsonDocument<0>();
 }
 
-DynamicJsonDocument SimpliSafe3::getLock() {
+StaticJsonDocument<192> SimpliSafe3::getLock() {
     SS_LOG_LINE("Getting lock.");
 
     if (subId.length() == 0) {
@@ -200,9 +202,10 @@ DynamicJsonDocument SimpliSafe3::getLock() {
     filter[0]["status"]["lockState"] = true;
     filter[0]["status"]["lockJamState"] = true;
 
-    DynamicJsonDocument data = authManager->request(
+    StaticJsonDocument<192> data;
+    int res = authManager->request(
         String(SS3API) + "/doorlock/" + subId, // url
-        192,                                   // size
+        data,                                  // size
         true,                                  // auth
         false,                                 // post
         "",                                    // payload
@@ -210,7 +213,7 @@ DynamicJsonDocument SimpliSafe3::getLock() {
         filter
     );
 
-    if (data.size() > 0) {
+    if (res >= 200 && res <= 299) {
         lockId = data[0]["serial"].as<String>();
         SS_LOG_LINE("Got lock ID %s.", lockId.c_str());
         return data[0];
@@ -295,14 +298,15 @@ int SimpliSafe3::setAlarmState(int newState) {
         getSubscription();
     }
 
-    DynamicJsonDocument data = authManager->request(
+    StaticJsonDocument<96> data;
+    int res = authManager->request(
         String(SS3API) + "/ss3/subscriptions/" + subId + "/state/" + SS_SETSTATE_VALUES[newState], // url
-        96, // size
+        data, // size
         true, // auth
         true // post
     );
 
-    if (data.size() > 0) {
+    if (res >= 200 && res <= 299) {
         const char *resState = data["state"].as<const char *>();
         for (int x = 0; x < sizeof(SS_GETSTATE_VALUES) / sizeof(SS_GETSTATE_VALUES[0]); x++) {
             if (strcmp(resState, SS_GETSTATE_VALUES[x]) == 0) {
@@ -324,7 +328,7 @@ int SimpliSafe3::getLockState() {
         getSubscription();
     }
 
-    DynamicJsonDocument lock = getLock();
+    StaticJsonDocument<192> lock = getLock();
 
     if (lock.size() > 0) {
         int resState = lock["status"]["lockState"].as<int>();
@@ -356,16 +360,17 @@ int SimpliSafe3::setLockState(int newState) {
     payloadDoc["state"] = SS_LOCKSTATE_VALUES[newState];
     serializeJson(payloadDoc, payload);
 
-    DynamicJsonDocument data = authManager->request(
+    StaticJsonDocument<256> data;
+    int res = authManager->request(
         String(SS3API) + "/doorlock/" + subId + "/" + lockId + "/state", // url
-        256,    // size: optimise
+        data,   // size
         true,   // auth
         true,   // post 
         payload,
         headers
     );
 
-    if (data.size() > 0) {
+    if (res >= 200 && res <= 299) {
         SS_LOG_LINE("Set lock state to %s", SS_LOCKSTATE_VALUES[newState]);
         return newState; // api is async and doesn't tell us if it worked
     }

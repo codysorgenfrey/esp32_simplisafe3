@@ -42,8 +42,8 @@ class SimpliSafe3 {
         unsigned long lastAuthCheck;
 
         String getUserID();
-        DynamicJsonDocument getSubscription();
-        DynamicJsonDocument getLock();
+        StaticJsonDocument<256> getSubscription();
+        StaticJsonDocument<192> getLock();
 
     public:
         SimpliSafe3();

@@ -98,11 +98,12 @@ bool SS3AuthManager::getAuthToken(String code) {
     payloadDoc["redirect_uri"] = SS_OAUTH_REDIRECT_URI;
     serializeJson(payloadDoc, payload);
     
-    DynamicJsonDocument res = request(SS_OAUTH + String("/token"), 3072, false, true, payload, headers);
+    DynamicJsonDocument resDoc(3072);
+    int res = request(SS_OAUTH + String("/token"), resDoc, false, true, payload, headers);
 
-    if (res.size() != 0) {
+    if (res >= 200 && res <= 299) {
         SS_LOG_LINE("Got authorization tokens.");
-        return storeAuthToken(res);
+        return storeAuthToken(resDoc);
     }
 
     SS_ERROR_LINE("Error getting authorization tokens.");
@@ -128,11 +129,15 @@ bool SS3AuthManager::refreshAuthToken() {
     payloadDoc["refresh_token"] = refreshToken;
     serializeJson(payloadDoc, payload);
 
-    DynamicJsonDocument res = request(SS_OAUTH + String("/token"), 3072, false, true, payload, headers);
+    DynamicJsonDocument resDoc(3072);
+    int res = request(SS_OAUTH + String("/token"), resDoc, false, true, payload, headers);
 
-    if (res.size() != 0) {
+    if (res >= 200 && res <= 299) {
         SS_LOG_LINE("Got refresh token.");
-        return storeAuthToken(res);
+        return storeAuthToken(resDoc);
+    } else if (res == 403 || res == 401) {
+        refreshToken = ""; // clear to re-auth
+        accessToken = "";
     }
     
     SS_ERROR_LINE("Error getting refresh token.");
@@ -284,8 +289,11 @@ bool SS3AuthManager::authorize(HardwareSerial *hwSerial, unsigned long baud) {
             return false;
         }
     }
+
+    bool refreshed = refreshAuthToken();
+    if (refreshToken.length() == 0) refreshed = authorize(hwSerial, baud);
         
-    return refreshAuthToken();
+    return refreshed;
 }
 
 bool SS3AuthManager::isAuthorized() {
@@ -299,9 +307,9 @@ bool SS3AuthManager::isAuthorized() {
     return authorized;
 }
 
-DynamicJsonDocument SS3AuthManager::request(
+int SS3AuthManager::request(
     String url, 
-    int docSize, 
+    JsonDocument &doc, 
     bool auth, 
     bool post, 
     String payload, 
@@ -314,8 +322,7 @@ DynamicJsonDocument SS3AuthManager::request(
     SS_DETAIL_LINE("Authori    zed: %s", auth ? "yes" : "no");
     SS_DETAIL_LINE("Payload: %s", payload.c_str());
 
-    DynamicJsonDocument doc(docSize);
-    SS_DETAIL_LINE("Created doc of %i size", docSize);
+    int res = -1;
 
     if (WiFi.status() == WL_CONNECTED) {
         HTTPClient https;
@@ -346,19 +353,17 @@ DynamicJsonDocument SS3AuthManager::request(
                 }
             }
 
-            int response;
-            if (post) response = https.POST(payload);
-            else response = https.GET();
+            if (post) res = https.POST(payload);
+            else res = https.GET();
             SS_DETAIL_LINE("Request sent. Response: %i", response);
 
-            if (response >= 200 && response <= 299) {
+            if (res >= 200 && res <= 299) {
                 DeserializationError err;
                 if (filter.size() != 0) err = deserializeJson(doc, client, DeserializationOption::Filter(filter), nestingLimit);
                 else err = deserializeJson(doc, client, nestingLimit);
                 
                 if (err) {
-                    if (err == DeserializationError::EmptyInput) doc["response"] = response; // no json response
-                    else SS_ERROR_LINE("API request deserialization error: %s", err.c_str());
+                    SS_ERROR_LINE("API request deserialization error: %s", err.c_str());
                 } else {
                     SS_DETAIL_LINE("Desearialized stream to json.");
                     #if SS_DEBUG >= SS_DEBUG_LEVEL_ALL
@@ -367,7 +372,7 @@ DynamicJsonDocument SS3AuthManager::request(
                     #endif
                 }
             } else {
-                SS_ERROR_LINE("Error, code: %i.", response);
+                SS_ERROR_LINE("Error, code: %i.", res);
                 SS_ERROR_LINE("Response: %s", https.getString().c_str());
             }
 
@@ -376,5 +381,5 @@ DynamicJsonDocument SS3AuthManager::request(
         } else SS_ERROR_LINE("Could not connect to %s.", url.c_str());
     } else SS_ERROR_LINE("Not connected to WiFi.");
 
-    return doc;
+    return res;
 }
