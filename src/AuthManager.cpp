@@ -135,9 +135,6 @@ bool SS3AuthManager::refreshAuthToken() {
     if (res >= 200 && res <= 299) {
         SS_LOG_LINE("Got refresh token.");
         return storeAuthToken(resDoc);
-    } else if (res == 403 || res == 401) {
-        refreshToken = ""; // clear to re-auth
-        accessToken = "";
     }
     
     SS_ERROR_LINE("Error getting refresh token.");
@@ -162,6 +159,9 @@ bool SS3AuthManager::storeAuthToken(const DynamicJsonDocument &doc) {
         return writeUserData();
     }
 
+    accessToken = ""; // reset so that string length is 0
+    refreshToken = "";
+    tokenType = "Bearer";
     SS_ERROR_LINE("Error storing authorization tokens.");
     return false;
 }
@@ -270,9 +270,9 @@ SS3AuthManager::SS3AuthManager() {
     }
 }
 
-bool SS3AuthManager::authorize(HardwareSerial *hwSerial, unsigned long baud) {
+bool SS3AuthManager::authorize(bool forceReauth, HardwareSerial *hwSerial, unsigned long baud) {
     SS_LOG_LINE("Authorizing.");
-    if (refreshToken.length() == 0) {
+    if (refreshToken.length() == 0 || forceReauth) {
         if (!hwSerial) hwSerial->begin(baud);
         while (!hwSerial) { ; }
         hwSerial->println("Get that damn URL code:");
@@ -289,11 +289,8 @@ bool SS3AuthManager::authorize(HardwareSerial *hwSerial, unsigned long baud) {
             return false;
         }
     }
-
-    bool refreshed = refreshAuthToken();
-    if (refreshToken.length() == 0) refreshed = authorize(hwSerial, baud);
         
-    return refreshed;
+    return refreshAuthToken();
 }
 
 bool SS3AuthManager::isAuthorized() {

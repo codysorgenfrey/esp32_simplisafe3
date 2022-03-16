@@ -232,13 +232,13 @@ SimpliSafe3::SimpliSafe3() {
     authManager = new SS3AuthManager();
 }
 
-bool SimpliSafe3::setup(HardwareSerial *hwSerial, unsigned long baud) {
+bool SimpliSafe3::setup(bool forceReauth, HardwareSerial *hwSerial, unsigned long baud) {
     SS_LOG_LINE("Setting up SimpliSafe.");
     inSerial = hwSerial;
     inBaud = baud;
 
     // get authorized for api calls
-    if (!authManager->authorize(inSerial, inBaud)) {
+    if (!authManager->authorize(forceReauth, inSerial, inBaud)) {
         SS_ERROR_LINE("Failed to authorize with SimpliSafe.");
         return false;
     }
@@ -255,7 +255,7 @@ void SimpliSafe3::loop() {
     const unsigned long diff = max(now, lastAuthCheck) - min(now, lastAuthCheck);
     if (diff >= SS_AUTH_CHECK_INTERVAL) {
         if (!authManager->isAuthorized()) {
-            if (!authManager->authorize(inSerial, inBaud)) {
+            if (!authManager->authorize(false, inSerial, inBaud)) {
                 SS_ERROR_LINE("Error refreshing authorization token.");
             }
         }

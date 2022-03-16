@@ -27,7 +27,7 @@ class SS3AuthManager {
         String accessToken;
 
         SS3AuthManager();
-        bool authorize(HardwareSerial *hwSerial, unsigned long baud);
+        bool authorize(bool forceReauth, HardwareSerial *hwSerial, unsigned long baud);
         bool isAuthorized();
         int request(
             String url, 

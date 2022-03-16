@@ -47,7 +47,7 @@ class SimpliSafe3 {
 
     public:
         SimpliSafe3();
-        bool setup(HardwareSerial *hwSerial = &Serial, unsigned long baud = 115200);
+        bool setup(bool forceReauth = false, HardwareSerial *hwSerial = &Serial, unsigned long baud = 115200);
         void loop();
         int  getAlarmState();
         int  setAlarmState(int newState);
