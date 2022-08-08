@@ -316,7 +316,7 @@ int SS3AuthManager::request(
 ) {
     SS_LOG_LINE("Making a request.");
     SS_DETAIL_LINE("Requesting: %s %s", post ? "POST" : "GET", url.c_str());
-    SS_DETAIL_LINE("Authori    zed: %s", auth ? "yes" : "no");
+    SS_DETAIL_LINE("Authorized: %s", auth ? "yes" : "no");
     SS_DETAIL_LINE("Payload: %s", payload.c_str());
 
     int res = -1;
@@ -352,7 +352,7 @@ int SS3AuthManager::request(
 
             if (post) res = https.POST(payload);
             else res = https.GET();
-            SS_DETAIL_LINE("Request sent. Response: %i", response);
+            SS_DETAIL_LINE("Request sent. Response: %i", res);
 
             if (res >= 200 && res <= 299) {
                 DeserializationError err;
