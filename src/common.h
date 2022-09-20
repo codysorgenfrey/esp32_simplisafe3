@@ -77,7 +77,7 @@ WQPJIrSPnNVeKtelttQKbfi3QBFGmh95DmK/D5fs4C8fF5Q=\n\
 #define SS_DEBUG_LEVEL_INFO 1
 #define SS_DEBUG_LEVEL_ALL 2
 
-#define SS_DEBUG SS_DEBUG_LEVEL_INFO
+#define SS_DEBUG SS_DEBUG_LEVEL_ERROR
 
 #if SS_DEBUG >= SS_DEBUG_LEVEL_ERROR
     #define SS_ERROR_LINE(message, ...) printf("ERR [%7lu][%.2fkb] SimpliSafe: " message "\n", millis(), (esp_get_free_heap_size() * 0.001f), ##__VA_ARGS__)
