@@ -1,8 +1,16 @@
+# ESP32 SimpliSafe3
+An arduino version of [Homebridge SimpliSafe 3](https://github.com/homebridge-simplisafe3/homebridge-simplisafe3).
+
 ## Notes
 Does not currently support multiple locations, systems, or locks. 
 Library defaults to the first of each.
 
+## Dependencies
+[Arduino JSON](https://github.com/bblanchon/ArduinoJson)  
+[Arduino WebSockets](https://github.com/Links2004/arduinoWebSockets)
+
 ## eventCids
+```
 1110:
 1120:
 1132:
@@ -56,3 +64,4 @@ Library defaults to the first of each.
     DOORLOCK_LOCKED
 9703:
     DOORLOCK_ERROR
+```
