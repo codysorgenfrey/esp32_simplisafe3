@@ -7,3 +7,6 @@ Thumbs.db
 build
 secrets.h
 .vscode
+
+debug*
+esp32.svd
