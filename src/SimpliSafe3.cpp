@@ -131,7 +131,7 @@ bool SimpliSafe3::startListeningToEvents(void (*eventCallback)(int eventId), voi
                 
                 // listen for events
                 if (type.equals("com.simplisafe.event.standard")) {
-                    SS_DETAIL_LINE("Event %i triggered, %s", res["data"]["eventCid"].as<int>(), res["data"]["messageSubject"].as<String>());
+                    SS_DETAIL_LINE("Event %i triggered, %s", res["data"]["eventCid"].as<int>(), res["data"]["messageSubject"].as<const char *>());
                     if (eventCallback) eventCallback(res["data"]["eventCid"]);
                 }
             }
